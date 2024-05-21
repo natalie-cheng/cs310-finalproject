@@ -1,143 +1,105 @@
-import requests
-import jsons
-
-import uuid
-import pathlib
-import logging
 import sys
-import os
-import base64
-import time
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
+from flask import Flask, request, redirect
 from configparser import ConfigParser
 
-############################################################
-#
-# prompt
-#
-def prompt():
-  """
-  Prompts the user and returns the command number
+# Flask app setup
+app = Flask(__name__)
 
-  Parameters
-  ----------
-  None
+# Spotify credentials
+SPOTIPY_CLIENT_ID = '620644335758449996fd913e74fb986a'
+SPOTIPY_CLIENT_SECRET = '66679493632746768231d6f91375c8e3'
+SPOTIPY_REDIRECT_URI = 'http://localhost:8888/callback'
 
-  Returns
-  -------
-  Command number entered by user (0, 1, 2, ...)
-  """
-  print()
-  print(">> Enter a command:")
-  print("   0 => end")
-  print("   1 => users")
-  print("   2 => jobs")
-  print("   3 => reset database")
-  print("   4 => upload pdf")
-  print("   5 => download results")
-  print("   6 => upload and poll")
+# Spotify authentication manager
+scope = 'user-top-read playlist-modify-private'
+auth_manager = SpotifyOAuth(client_id=SPOTIPY_CLIENT_ID,
+                            client_secret=SPOTIPY_CLIENT_SECRET,
+                            redirect_uri=SPOTIPY_REDIRECT_URI,
+                            scope=scope)
 
-  cmd = input()
+# Spotipy object
+sp = None
 
-  if cmd == "":
-    cmd = -1
-  elif not cmd.isnumeric():
-    cmd = -1
-  else:
-    cmd = int(cmd)
+@app.route('/')
+def login():
+    return redirect(auth_manager.get_authorize_url())
 
-  return cmd
+@app.route('/callback')
+def callback():
+    code = request.args.get('code')
+    token_info = auth_manager.get_access_token(code)
+    if token_info:
+        global sp
+        sp = spotipy.Spotify(auth_manager=auth_manager)
+        return main_menu()
+    return "login success"
 
-############################################################
-# main
-#
-try:
-  print('** Welcome to SongSpot **')
-  print()
+def main_menu():
+    while True:
+        print("Welcome to SongSpot!")
+        print(">> Enter a command:")
+        print("   0 => exit")
+        print("   1 => top artists")
+        print("   2 => analyze genres")
 
-  # eliminate traceback so we just get error message:
-  sys.tracebacklimit = 0
+        cmd = input()
 
-  #
-  # what config file should we use for this session?
-  #
-  config_file = 'spotify-client-config.ini'
+        if cmd == '0':
+            break
+        elif cmd == '1':
+            print_user_top_items()
+        elif cmd == '2':
+            analyze_user_taste()
+        else:
+            print("Invalid command")
 
-  print("Config file to use for this session?")
-  print("Press ENTER to use default, or")
-  print("enter config file name>")
-  s = input()
+    return "done - exit through command line"
 
-  if s == "":  # use default
-    pass  # already set
-  else:
-    config_file = s
-
-  #
-  # does config file exist?
-  #
-  if not pathlib.Path(config_file).is_file():
-    print("**ERROR: config file '", config_file, "' does not exist, exiting")
-    sys.exit(0)
-
-  #
-  # setup base URL to web service:
-  #
-  configur = ConfigParser()
-  configur.read(config_file)
-  baseurl = configur.get('client', 'webservice')
-
-  #
-  # make sure baseurl does not end with /, if so remove:
-  #
-  if len(baseurl) < 16:
-    print("**ERROR: baseurl '", baseurl, "' is not nearly long enough...")
-    sys.exit(0)
-
-  if baseurl == "https://YOUR_GATEWAY_API.amazonaws.com":
-    print("**ERROR: update config file with your gateway endpoint")
-    sys.exit(0)
-
-  if baseurl.startswith("http:"):
-    print("**ERROR: your URL starts with 'http', it should start with 'https'")
-    sys.exit(0)
-
-  lastchar = baseurl[len(baseurl) - 1]
-  if lastchar == "/":
-    baseurl = baseurl[:-1]
-
-  #
-  # main processing loop:
-  #
-  cmd = prompt()
-
-  while cmd != 0:
-    #
-    if cmd == 1:
-      print("hello")
-    # elif cmd == 2:
-    #   jobs(baseurl)
-    # elif cmd == 3:
-    #   reset(baseurl)
-    # elif cmd == 4:
-    #   upload(baseurl)
-    # elif cmd == 5:
-    #   download(baseurl)
-    # elif cmd == 6:
-    #   upload_and_poll(baseurl)
+def get_user_top_items(item_type='artists', time_range='long_term', limit=10):
+    """Retrieve the top artists or tracks for a user."""
+    if item_type == 'artists':
+        top_items = sp.current_user_top_artists(time_range=time_range, limit=limit)
     else:
-      print("** Unknown command, try again...")
-    #
-    cmd = prompt()
+        top_items = sp.current_user_top_tracks(time_range=time_range, limit=limit)
+    
+    return top_items['items']
 
-  #
-  # done
-  #
-  print()
-  print('** done **')
-  sys.exit(0)
+def print_user_top_items():
+    """Print the user's top artists and tracks."""
+    top_artists = get_user_top_items('artists')
+    top_tracks = get_user_top_items('tracks')
+    
+    print("Top Artists:")
+    for artist in top_artists:
+        print(f"- {artist['name']}")
 
-except Exception as e:
-  logging.error("**ERROR: main() failed:")
-  logging.error(e)
-  sys.exit(0)
+    print("\nTop Tracks:")
+    for track in top_tracks:
+        print(f"- {track['name']} by {track['artists'][0]['name']}")
+
+def analyze_user_taste():
+    """Analyze the genres and popularity of the user's top artists and tracks."""
+    top_artists = get_user_top_items('artists')
+    top_tracks = get_user_top_items('tracks')
+    
+    genres = []
+    popularity = []
+
+    for artist in top_artists:
+        genres.extend(artist['genres'])
+        popularity.append(artist['popularity'])
+    
+    for track in top_tracks:
+        popularity.append(track['popularity'])
+
+    genres = list(set(genres))
+    avg_popularity = sum(popularity) / len(popularity) if popularity else 0
+    
+    print(f"Genres: {', '.join(genres)}")
+    print(f"Average Popularity: {avg_popularity}")
+
+if __name__ == '__main__':
+    app.run(port=8888)

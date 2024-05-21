@@ -1,2 +1,0 @@
-client id: 620644335758449996fd913e74fb986a
-client secret: e067cbb11c054d17857e9dfef4e4816a
