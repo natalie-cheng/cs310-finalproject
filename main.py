@@ -26,7 +26,7 @@ config.read('client-config.ini')
 # CLIENT_ID = config.get('spotify', 'client_id')
 CLIENT_ID = '620644335758449996fd913e74fb986a'
 CLIENT_SECRET = '66679493632746768231d6f91375c8e3'
-REDIRECT_URI = 'http://localhost:8888/callback'
+REDIRECT_URI = 'http://18.117.147.169/callback'
 
 # spotify authentication manager
 scope = 'user-top-read playlist-modify-private'

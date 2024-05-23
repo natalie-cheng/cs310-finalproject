@@ -1,8 +1,10 @@
+# general stuff
 *.ini
 *.zip
 *.cache
+__pycache__/
 
-# Logs
+# logs
 logs
 *.log
 npm-debug.log*
@@ -11,12 +13,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# node stuff?
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# vscode stuff
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -27,4 +30,7 @@ dist-ssr
 *.sln
 *.sw?
 
+# server stuff
 venv/
+env/
+*.pem
