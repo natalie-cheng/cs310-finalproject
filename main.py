@@ -20,13 +20,12 @@ app = Flask(__name__)
 
 # read config file
 config = ConfigParser()
-config.read('client-config.ini')
+config.read('config.ini')
 
 # spotify credentials
-# CLIENT_ID = config.get('spotify', 'client_id')
-CLIENT_ID = '620644335758449996fd913e74fb986a'
-CLIENT_SECRET = '66679493632746768231d6f91375c8e3'
-REDIRECT_URI = 'http://18.117.147.169/callback'
+CLIENT_ID = config.get('spotify', 'client_id')
+CLIENT_SECRET = config.get('spotify', 'client_secret')
+REDIRECT_URI = config.get('spotify', 'redirect_uri')
 
 # spotify authentication manager
 scope = 'user-top-read playlist-modify-private'
