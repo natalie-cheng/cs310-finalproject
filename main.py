@@ -3,6 +3,7 @@
 #
 
 import sys
+import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -21,6 +22,21 @@ app = Flask(__name__)
 # read config file
 config = ConfigParser()
 config.read('config.ini')
+
+# rds credentials
+# read the read-write credentials
+# open the connection
+# drop the existing songs table
+# create an empty
+# -- DROP TABLE IF EXISTS songs;
+
+# -- CREATE TABLE songs(
+# --     song_id     varchar(64) not null,
+# --     track_name  varchar(128) not null,
+# --     artist      varchar(128) not null,
+# --     PRIMARY KEY (song_id),
+# --     UNIQUE      (song_id)
+# -- );
 
 # spotify credentials
 CLIENT_ID = config.get('spotify', 'client_id')
@@ -253,6 +269,12 @@ def recommend_songs(time, number):
     # generate recommendations based on seed tracks
     recommendations = sp.recommendations(seed_tracks=seed_tracks, limit=number)
     recommended_tracks = recommendations['tracks']
+
+    # check if the tracks are not already in the database table
+    # if they are, get some new tracks
+
+    # after getting the complete list of new tracks
+    # add all to the database table
 
     print("\nrecommended playlist")
     for track in recommended_tracks:
