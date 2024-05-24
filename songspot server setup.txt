@@ -1,0 +1,41 @@
+
+cs310 final project ec2 server setup
+
+
+INDIVIDUAL SSH INTO SERVER
+1. navigate to project folder
+2. ssh -i "songspot.pem" ubuntu@ec2-18-117-147-169.us-east-2.compute.amazonaws.com
+3. cd songspot
+4. source venv/bin/activate
+5. python3 main.py
+6. open ip address: http://18.117.147.169/
+7. it will load indefinitely - return to console to use app
+
+username: songspot
+password: CS310songspot
+
+
+
+INTIAL SERVER SETUP
+1. navigate to project folder
+2. chmod 400 songspot.pem
+3. ssh -i "songspot.pem" ubuntu@ec2-18-117-147-169.us-east-2.compute.amazonaws.com
+4. sudo apt update
+5. sudo apt upgrade -y
+6. git clone https://github.com/natalie-cheng/songspot.git
+7. cd songspot
+8. sudo apt install python3.12-venv
+9. python3 -m venv venv
+10. source venv/bin/activate
+11. pip3 install -r requirements.txt
+
+to test if everything is working:
+- gunicorn -b 127.0.0.1:8888 main:app
+- if everything is working, it should say something like "Booting worker with pid: [some port]"
+- curl localhost:8888
+- if everything is working, it should print out some html
+
+git remote set-url origin git@github.com:natalie-cheng/songspot.git
+
+12. gunicorn config
+13. nginx config
