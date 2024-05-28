@@ -5,6 +5,7 @@
 import sys
 import os
 import spotipy
+import datatier
 from spotipy.oauth2 import SpotifyOAuth
 
 from flask import Flask, request, redirect
@@ -13,7 +14,7 @@ from configparser import ConfigParser
 
 ############################################################
 #
-# flask setup and spotify authentication
+# flask setup, rds setup, spotify authentication
 #
 
 # setup flask app
@@ -23,20 +24,34 @@ app = Flask(__name__)
 config = ConfigParser()
 config.read('config.ini')
 
-# rds credentials
-# read the read-write credentials
-# open the connection
-# drop the existing songs table
-# create an empty
-# -- DROP TABLE IF EXISTS songs;
+# read rds read-write credentials
+rds_endpoint = config.get('rds-read-write', 'endpoint')
+rds_portnum = int(config.get('rds-read-write', 'port_number'))
+rds_username = config.get('rds-read-write', 'user_name')
+rds_pwd = config.get('rds-read-write', 'user_pwd')
+rds_dbname = config.get('rds-read-write', 'db_name')
 
-# -- CREATE TABLE songs(
-# --     song_id     varchar(64) not null,
-# --     track_name  varchar(128) not null,
-# --     artist      varchar(128) not null,
-# --     PRIMARY KEY (song_id),
-# --     UNIQUE      (song_id)
-# -- );
+try:
+    # open the connection
+    dbConn = datatier.get_dbConn(rds_endpoint, rds_portnum, rds_username, rds_pwd, rds_dbname)
+
+    # drop the existing songs table
+    sql = "DROP TABLE IF EXISTS songs;"
+    datatier.perform_action(dbConn, sql)
+
+    # create an empty songs table
+    sql = """
+        CREATE TABLE songs(
+            song_id     varchar(64) not null,
+            track_name  varchar(128) not null,
+            artist      varchar(128) not null,
+            PRIMARY KEY (song_id)
+        );
+        """
+    datatier.perform_action(dbConn, sql)
+
+except Exception as e:
+        print("Error setting up song table:", str(e))
 
 # spotify credentials
 CLIENT_ID = config.get('spotify', 'client_id')
@@ -85,6 +100,7 @@ def main_menu():
         print("   3 => analyze genres")
         print("   4 => analyze popularity")
         print("   5 => generate recommendations")
+        print("   6 => print all recommendations")
 
         cmd = input()
 
@@ -107,6 +123,8 @@ def main_menu():
             time = input("time range? (long_term, medium_term, short_term)\n")
             number = input("how many songs?\n")
             recommend_songs(time, number)
+        elif cmd == '6':
+            print_all_recommendations()
         else:
             print("invalid command")
 
@@ -157,6 +175,7 @@ def print_user_top_items(filter, time = 'medium_term'):
     Parameters
     ----------
     filter: artists or tracks
+    time: time frame
 
     Returns
     -------
@@ -186,7 +205,7 @@ def analyze_user_genre(time):
 
     Parameters
     ----------
-    none
+    time: time frame to analyze tracks
 
     Returns
     -------
@@ -213,7 +232,7 @@ def analyze_user_popularity(time):
 
     Parameters
     ----------
-    none
+    time: time frame to analyze tracks
 
     Returns
     -------
@@ -250,10 +269,13 @@ def analyze_user_popularity(time):
 #
 def recommend_songs(time, number):
     """
-    Generate a recommended playlist for the user
+    Generate a recommended playlist of new songs for the user.
+    Check if the recommended songs exist in the database ie. have been recommended before
+    If so, find new songs to recommend
 
     Parameters
     ----------
+    time: time frame to seed the recommendations
     number: # of songs to recommend
 
     Returns
@@ -261,24 +283,136 @@ def recommend_songs(time, number):
     none
     """
 
+    # cast number for operations
+    number = int(number)
+
     # create seed tracks based on users top 5 tracks
     top_tracks = get_user_top_items('tracks', time, limit=5)
     if not top_tracks: return
     seed_tracks = [track['id'] for track in top_tracks]
 
-    # generate recommendations based on seed tracks
-    recommendations = sp.recommendations(seed_tracks=seed_tracks, limit=number)
-    recommended_tracks = recommendations['tracks']
+    # list of recommended tracks
+    recommended_tracks = []
+    # loop tracker
+    index = 0
+    # track recommendations
+    tracks = []
 
-    # check if the tracks are not already in the database table
-    # if they are, get some new tracks
+    # until there are sufficient recommendations
+    while(len(recommended_tracks)<number):
+        # get new recommendations if there are none
+        if len(tracks)==0:
+            recommendations = sp.recommendations(seed_tracks=seed_tracks, limit=number)
+            tracks = recommendations['tracks']
 
-    # after getting the complete list of new tracks
-    # add all to the database table
+        # loop through the recommendations
+        for track in tracks:
+            # add it if it has not been recommended before
+            if not is_track_in_database(track['id']):
+                recommended_tracks.append(track)
+            # remove this track from the recommendations ie. it's been sorted
+            tracks.remove(track)
+            
+        # check to see the loop hasn't timed out
+        # prevent infinite loop if unique recs can't be found
+        index += 1
+        if index > (number*10):
+            return "cannot find recommendations, try again"
+
+    # add new recommended tracks to the database table
+    for track in recommended_tracks:
+        try:
+            # query database
+            sql = "INSERT INTO songs (song_id, track_name, artist) VALUES (%s, %s, %s)"
+            datatier.perform_action(dbConn, sql, [track['id'], track['name'], track['artists'][0]['name']])
+
+        except Exception as e:
+            print("Error inserting song into database:", str(e))
 
     print("\nrecommended playlist")
     for track in recommended_tracks:
             print(f"- {track['name']} by {track['artists'][0]['name']}")
+
+#
+# helper: is track in database
+#
+def is_track_in_database(song_id):
+    """
+    Check if a song is in the database
+
+    Parameters
+    ----------
+    song_id: id of the track to check
+
+    Returns
+    -------
+    boolean
+    """
+    
+    try:
+        # query database
+        sql = "SELECT * FROM songs WHERE song_id = %s"
+        row = datatier.retrieve_one_row(dbConn, sql, [song_id])
+
+        # return if songs exists in database
+        if row: return True
+        else: return False
+
+    except Exception as e:
+        print("Error checking song in database:", str(e))
+        return False
+
+#
+# print all the stored recommendations
+#
+def print_all_recommendations():
+    """
+    Print all the recommendations stored in RDS
+
+    Parameters
+    ----------
+    none
+
+    Returns
+    -------
+    none
+    """
+
+    # sql query
+    sql = "SELECT * FROM songs"
+    rows = datatier.retrieve_all_rows(dbConn, sql)
+
+    # track song ids for playlist
+    track_uris = []
+
+    # check if there are recommendations
+    if not rows:
+        print("\nno recommendations available")
+        return
+
+    # print out the songs
+    print("\nall recommended songs")
+    for row in rows:
+        song_id, track_name, artist = row
+        print(f"- {track_name} by {artist}")
+        # track song ids
+        track_uris.append("spotify:track:"+song_id)
+
+    # create playlist?
+    print("\nadd this playlist to your spotify account? (yes/no)")
+    answer = input()
+    if answer not in ["yes","no"]:
+        print("invalid answer")
+        return
+    
+    # create the playlist with all the recommended songs
+    if answer == "yes":
+        # get the current user
+        user = sp.me()['id']
+        playlist = sp.user_playlist_create(user=user, name="songspot playlist", public=False)
+        sp.playlist_add_items(playlist['id'], track_uris)
+        print("playlist successfully created")
+
 
 # run the flask app on port 8888
 if __name__ == '__main__':
