@@ -19,7 +19,7 @@ Functions 1-5 have the option of analyzing different time ranges (long_term, med
 - The program runs on a Flask application deployed to an EC2 server.
 - The UI consists of simple print statements on the Flask client-side.
 - Every function utilizes and interacts with the Spotify API and database.
-- Functions 3-5 involve computation.
+- Functions 4-6 involve computation.
 - Functions 5 and 6 utilize RDS.
     - In function 5, recommeded songs are stored in a database and referenced so that no songs are recommeded more than once in a given session
     - In function 6, all the songs recommended during the session are retrieved and printed out. The user can then choose to have SongSpot create a playlist in their account with these songs.
