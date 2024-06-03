@@ -1,21 +1,20 @@
 
 cs310 final project ec2 server setup
 
-
-INDIVIDUAL SSH INTO SERVER (double check host is correct, changes after restarting)
-1. navigate to project folder
+INDIVIDUAL SSH INTO SERVER
+1. navigate to project folder with the songspot.pem file
 2. chmod 400 songspot.pem
 3. ssh -i "songspot.pem" ubuntu@ec2-3-17-132-158.us-east-2.compute.amazonaws.com
 4. cd songspot
 5. source venv/bin/activate
 6. python3 main.py
-7. open ip address: http://3.14.67.183/
+7. open ip address: http://3.17.132.158/
 8. it will load indefinitely - return to console to use app
 
 
 ~~~~~~~
 
-INTIAL SERVER SETUP (NOT FOR LOGGING IN ONLY FOR INITIAL SETUP SO DON'T DO THIS)
+INTIAL SERVER SETUP (DO NOT DO THIS IT IS JUST FOR MY OWN NOTES)
 1. navigate to project folder
 2. chmod 400 songspot.pem
 3. ssh -i "songspot.pem" ubuntu@ec2-18-117-147-169.us-east-2.compute.amazonaws.com
